@@ -2098,7 +2098,7 @@ if (document.querySelector("[data-sphere-scene]")) {
         updateHoveredTile(clickedTile);
         viewState.zoomTarget = Math.max(viewState.zoomTarget, 0.82);
         focusFlatTile(clickedTile);
-      } else if (!interaction.moved) {
+      } else if (!interaction.moved && viewState.flatten < 0.55) {
         setSelectedTile(null);
         updateHoveredTile(null);
         viewState.zoomTarget = Math.max(0.08, viewState.zoomTarget - 0.22);
