@@ -1088,6 +1088,15 @@ if (document.querySelector("[data-sphere-scene]")) {
       startPanY: 0,
     };
 
+    const activePointers = new Map();
+
+    const gestureState = {
+      pinching: false,
+      startDistance: 0,
+      startZoom: 0,
+      suppressTap: false,
+    };
+
     const flatState = {
       x: 0,
       y: 0,
@@ -1729,6 +1738,107 @@ if (document.querySelector("[data-sphere-scene]")) {
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     }
 
+    function storePointerEvent(event) {
+      activePointers.set(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        pointerType: event.pointerType,
+      });
+    }
+
+    function removePointerEvent(event) {
+      activePointers.delete(event.pointerId);
+    }
+
+    function getActivePointers() {
+      return Array.from(activePointers.values());
+    }
+
+    function getPointerDistance(firstPointer, secondPointer) {
+      return Math.hypot(
+        secondPointer.clientX - firstPointer.clientX,
+        secondPointer.clientY - firstPointer.clientY
+      );
+    }
+
+    function getPointerCenter(firstPointer, secondPointer) {
+      return {
+        clientX: (firstPointer.clientX + secondPointer.clientX) * 0.5,
+        clientY: (firstPointer.clientY + secondPointer.clientY) * 0.5,
+      };
+    }
+
+    function stopDragging() {
+      interaction.dragging = false;
+      container.classList.remove("sphere-scene__viewport--dragging");
+    }
+
+    function beginPinch() {
+      const pointers = getActivePointers();
+
+      if (pointers.length < 2) return;
+
+      const [firstPointer, secondPointer] = pointers;
+      const center = getPointerCenter(firstPointer, secondPointer);
+
+      gestureState.pinching = true;
+      gestureState.startDistance = Math.max(
+        getPointerDistance(firstPointer, secondPointer),
+        1
+      );
+      gestureState.startZoom = viewState.zoomTarget;
+      gestureState.suppressTap = true;
+      stopDragging();
+      setPointer(center);
+      updateHoveredTile(null);
+    }
+
+    function updatePinchZoom() {
+      const pointers = getActivePointers();
+
+      if (!gestureState.pinching || pointers.length < 2) return;
+
+      const [firstPointer, secondPointer] = pointers;
+      const distance = getPointerDistance(firstPointer, secondPointer);
+      const center = getPointerCenter(firstPointer, secondPointer);
+      const pinchSpan = Math.max(
+        Math.min(container.clientWidth, container.clientHeight),
+        1
+      );
+      const zoomDelta =
+        ((distance - gestureState.startDistance) / pinchSpan) * 1.45;
+
+      setPointer(center);
+      viewState.zoomTarget = clamp(
+        gestureState.startZoom + zoomDelta,
+        sphereConfig.minZoom,
+        sphereConfig.maxZoom
+      );
+
+      if (viewState.zoomTarget < 0.24) {
+        setSelectedTile(null);
+      }
+    }
+
+    function maybeResumeSinglePointerDrag() {
+      const pointers = getActivePointers();
+
+      if (gestureState.pinching || pointers.length !== 1) return;
+
+      const [pointerState] = pointers;
+      interaction.dragging = true;
+      interaction.dragMode = currentDragMode();
+      interaction.moved = true;
+      interaction.downX = pointerState.clientX;
+      interaction.downY = pointerState.clientY;
+      interaction.lastX = pointerState.clientX;
+      interaction.lastY = pointerState.clientY;
+      interaction.lastMoveTime = performance.now();
+      interaction.startPanX = flatState.targetX;
+      interaction.startPanY = flatState.targetY;
+      container.classList.add("sphere-scene__viewport--dragging");
+    }
+
     function pickTileHit() {
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObjects(tileMeshes, false);
@@ -1846,6 +1956,18 @@ if (document.querySelector("[data-sphere-scene]")) {
     }
 
     function onPointerDown(event) {
+      storePointerEvent(event);
+
+      if (activePointers.size >= 2) {
+        beginPinch();
+
+        if (container.setPointerCapture) {
+          container.setPointerCapture(event.pointerId);
+        }
+        return;
+      }
+
+      gestureState.suppressTap = false;
       interaction.dragging = true;
       interaction.dragMode = currentDragMode();
       interaction.moved = false;
@@ -1867,6 +1989,18 @@ if (document.querySelector("[data-sphere-scene]")) {
     }
 
     function onPointerMove(event) {
+      if (activePointers.has(event.pointerId)) {
+        storePointerEvent(event);
+      }
+
+      if (activePointers.size >= 2) {
+        if (!gestureState.pinching) {
+          beginPinch();
+        }
+        updatePinchZoom();
+        return;
+      }
+
       setPointer(event);
 
       if (!interaction.dragging) {
@@ -1917,10 +2051,32 @@ if (document.querySelector("[data-sphere-scene]")) {
     }
 
     function onPointerUp(event) {
+      const wasPinching = gestureState.pinching;
+
+      removePointerEvent(event);
+
+      if (wasPinching) {
+        if (activePointers.size >= 2) {
+          beginPinch();
+          return;
+        }
+
+        gestureState.pinching = false;
+        stopDragging();
+
+        if (activePointers.size === 1) {
+          maybeResumeSinglePointerDrag();
+        } else {
+          gestureState.suppressTap = false;
+        }
+
+        updateHoveredTile(null);
+        return;
+      }
+
       const clickedHit = !interaction.moved ? pickTileHit() : null;
       const clickedTile = clickedHit ? clickedHit.tile : null;
-      interaction.dragging = false;
-      container.classList.remove("sphere-scene__viewport--dragging");
+      stopDragging();
 
       if (container.releasePointerCapture) {
         try {
@@ -1930,7 +2086,11 @@ if (document.querySelector("[data-sphere-scene]")) {
         }
       }
 
-      if (triggerTileAction(clickedHit)) {
+      if (gestureState.suppressTap) {
+        gestureState.suppressTap = false;
+        setSelectedTile(null);
+        updateHoveredTile(null);
+      } else if (triggerTileAction(clickedHit)) {
         setSelectedTile(null);
         updateHoveredTile(null);
       } else if (clickedTile) {
@@ -1948,7 +2108,7 @@ if (document.querySelector("[data-sphere-scene]")) {
     }
 
     function onPointerLeave() {
-      if (!interaction.dragging) {
+      if (!interaction.dragging && !gestureState.pinching) {
         updateHoveredTile(null);
       }
     }
