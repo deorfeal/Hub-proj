@@ -1,0 +1,31 @@
+%title-font {
+
+}
+
+@function max($numbers...) {
+    @return m#{a}x(#{$numbers});
+}
+@function min($numbers...) {
+    @return m#{i}n(#{$numbers});
+}
+
+@function adaptive-value($desktopSize, $mobileSize) {
+    $minWidth: 375; // Минимальная ширина экрана
+    $maxWidth: 1310; // Максимальная ширина экрана
+
+    @if $desktopSize >$mobileSize {
+        // Уменьшение от десктопа к мобильному
+        $addSize: $desktopSize - $mobileSize;
+        @return clamp(#{$mobileSize}rem,
+            calc(#{$mobileSize}rem + #{$addSize} * ((100vw - #{$minWidth}rem) / (#{$maxWidth} - #{$minWidth}))),
+            #{$desktopSize}rem);
+    }
+
+    @else {
+        // Увеличение от десктопа к мобильному
+        $addSize: $mobileSize - $desktopSize;
+        @return clamp(#{$desktopSize}rem,
+            calc(#{$mobileSize}rem - #{$addSize} * ((100vw - #{$minWidth}rem) / (#{$maxWidth} - #{$minWidth}))),
+            #{$mobileSize}rem);
+    }
+}
