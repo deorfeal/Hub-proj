@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sphere Bundle</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:ital,wght@0,200..700;1,200..700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="css/style.min.css">
+</head>
+
+<body class="sphere-page">
+    <div class="wrapper">
+        <main class="main main--sphere">
+            <section class="main__sphere sphere-scene" data-sphere-scene>
+                <div class="sphere-scene__glow sphere-scene__glow--left" aria-hidden="true"></div>
+                <div class="sphere-scene__glow sphere-scene__glow--right" aria-hidden="true"></div>
+                <div class="sphere-scene__grid" aria-hidden="true"></div>
+
+                <div class="sphere-scene__viewport" id="sphere-app"></div>
+
+                <div class="sphere-scene__overlay" aria-hidden="true">
+                    <svg class="sphere-scene__lines" id="sphere-callout-lines"></svg>
+                    <div class="sphere-scene__callout" id="sphere-callout">
+                        <span class="sphere-scene__callout-eyebrow" id="sphere-callout-eyebrow"></span>
+                        <span class="sphere-scene__callout-title" id="sphere-callout-title"></span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+    <script src="js/main.min.js"></script>
+</body>
+
+</html>
